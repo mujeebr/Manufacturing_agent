@@ -6,6 +6,91 @@ suppliers, maintenance, inventory) by querying a SQLite database,
 optionally generating a chart, and returning a grounded, synthesized
 answer — with human approval of every SQL query before it runs.
 
+
+## Problem statement
+
+Manufacturing companies sit on rich operational data — plants, production
+runs, defect rates, maintenance costs, inventory, suppliers — but most of
+that value is locked behind SQL, BI tools, and specialist analysts.
+
+Typical pain points:
+
+- **Slow answers.** A plant manager asking “which line has the worst
+  downtime this quarter?” waits for an analyst to write queries, pull
+  numbers, and maybe build a chart.
+- **High barrier to data.** Operators and supervisors who know the
+  business rarely know the schema; they cannot self-serve safely.
+- **Risky ad-hoc SQL.** Unreviewed queries can be wrong, expensive, or
+  (in less locked-down systems) destructive.
+- **Fragmented insights.** Numbers live in one place, charts in another,
+  and the narrative for leadership is assembled by hand.
+
+The result: decisions lag, tribal knowledge stays tribal, and the
+warehouse of manufacturing data under-delivers.
+
+## How this project helps
+
+This system is a **multi-agent analytics assistant** for a fictional firm
+(“Northbridge Precision Manufacturing”) that demonstrates how a company
+can turn operational SQLite data into grounded answers — in plain English,
+with optional charts, under human control.
+
+| Company need | How the project addresses it |
+|---|---|
+| Ask questions in natural language | Orchestrator + SQL deep agent turn the question into read-only SQL against production/quality/maintenance/inventory tables |
+| Trust the numbers | Every generated query can pause for **human approve / edit / reject** before it hits the database |
+| See the story, not just rows | Response agent synthesizes a manager-ready answer from query results |
+| Spot patterns quickly | Visualisation subagent builds a chart when the question implies comparison, trend, or ranking |
+| Keep the warehouse safe | SQL tool allows **SELECT only**; no writes or DDL |
+| Scale specialist expertise | Agent “skills” encode analyst procedures (routing, SQL looping, charting, synthesis) so the same playbook runs consistently |
+
+In short: it shortens the path from **business question → trusted answer
+(+ chart)** for manufacturing ops, while keeping a human in the loop and
+the data store read-only.
+
+> **Note:** All company data here is synthetic (seeded via Faker). The
+> architecture is what would plug into a real manufacturing warehouse or
+> replica database.
+
+---
+
+## Mermaid diagram
+
+```mermaid
+flowchart TD
+    START([START]) --> orchestrator[orchestrator]
+    orchestrator --> sql_plan[sql_plan]
+
+    sql_plan --> route_after_plan{route_after_plan}
+
+    route_after_plan -->|"not finished"| sql_execute[sql_execute]
+    route_after_plan -->|"finished + needs_visualization"| visualization_subagent[visualization_subagent]
+    route_after_plan -->|"finished + sql_only"| response_agent[response_agent]
+
+    sql_execute -.->|"HITL interrupt_before<br/>approve / edit / reject"| HITL([Human approval])
+    HITL -.-> sql_execute
+
+    sql_execute --> route_after_execute{route_after_execute}
+
+    route_after_execute -->|"continue"| sql_plan
+    route_after_execute -->|"max_iterations"| sql_force_finish[sql_force_finish]
+    route_after_execute -->|"finish + needs_visualization"| visualization_subagent
+    route_after_execute -->|"finish + sql_only"| response_agent
+
+    sql_force_finish --> route_after_force_finish{route_after_force_finish}
+    route_after_force_finish -->|"needs_visualization"| visualization_subagent
+    route_after_force_finish -->|"sql_only"| response_agent
+
+    visualization_subagent --> response_agent
+    response_agent --> END([END])
+
+    subgraph SQL Deep Agent loop
+        sql_plan
+        sql_execute
+        sql_force_finish
+    end
+```
+
 ## Architecture
 
 ```
